@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { Home, CalendarDays, Map, Users, User, Mountain, MapPin, Clock, Footprints, ChevronRight, Plus, ArrowLeft, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { allRows } from '../lib/pagination';
-import { MAX_GPX_BYTES, parseGPX, routeStats, type Point } from '../lib/gpx';
+import { GPX_MIME_TYPE, gpxUploadBody, MAX_GPX_BYTES, parseGPX, routeStats, type Point } from '../lib/gpx';
 import type { Attendance, Membership, Profile, Role, Route, Team, Training } from '../lib/types';
 const RouteMap = dynamic(() => import('./route-map'), { ssr: false, loading: () => <p>Cargando mapa…</p> });
 const emptyForm = { title: '', starts_at: '', place: '', km: 0, gain: 0, duration: 90, level: 'Todos', description: '', gear: '' };
@@ -100,7 +100,7 @@ export default function Dashboard({ userId }: { userId: string }) {
       setEditing(id); // A failed upload can be retried without duplicating the training.
       if (gpxFile) {
         const path = `${teamId}/${id}/${crypto.randomUUID()}.gpx`;
-        const upload = await db.storage.from('gpx').upload(path, gpxFile, { contentType: 'application/gpx+xml', upsert: false });
+        const upload = await db.storage.from('gpx').upload(path, gpxUploadBody(gpxFile), { contentType: GPX_MIME_TYPE, upsert: false });
         if (upload.error) throw new Error(`Entrenamiento guardado; la ruta no se subió: ${upload.error.message}`);
         const old = routes.find(r => r.training_id === id);
         const route = await db.from('routes').upsert({ training_id: id, team_id: teamId, path, filename: gpxFile.name.slice(0,200) });
