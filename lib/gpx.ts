@@ -1,5 +1,11 @@
 export type Point = { lat: number; lon: number; ele: number | null; segment: number };
 export const MAX_GPX_BYTES = 5 * 1024 * 1024;
+export const GPX_MIME_TYPE = 'application/gpx+xml';
+// Storage reads the MIME of the multipart Blob, not the upload contentType option.
+// Call after GPX validation; browsers often give .gpx files an empty/generic MIME.
+export function gpxUploadBody(file: Blob): Blob {
+  return file.slice(0, file.size, GPX_MIME_TYPE);
+}
 export function parseGPX(xml: string): Point[] {
   if (new TextEncoder().encode(xml).length > MAX_GPX_BYTES) throw new Error('El GPX supera 5 MB.');
   if (/<!DOCTYPE|<!ENTITY/i.test(xml)) throw new Error('GPX no válido: no se admiten entidades XML.');
