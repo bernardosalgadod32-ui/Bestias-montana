@@ -7,7 +7,7 @@ Proyecto: `zjfzftxrtmuwuqwvrfnl`.
 1. Abre [SQL Editor](https://supabase.com/dashboard/project/zjfzftxrtmuwuqwvrfnl/sql/new).
 2. Revisa y ejecuta **una sola vez** `supabase/migrations/202609210001_multiuser.sql` completo. Es transaccional; si hay error no deja una instalación parcial. Está pensado para una base sin estas tablas; no elimina tablas existentes.
 3. En Authentication → URL Configuration, configura Site URL como `https://bestias-montana.vercel.app` y añade esa URL y `http://localhost:3000` a Redirect URLs. Añade la URL exacta de cada preview que quieras usar para autenticación.
-4. Mantén la confirmación de correo activada. Comprueba el proveedor Email y configura SMTP para los envíos de producción si los límites del proveedor de prueba no son suficientes.
+4. Mantén la confirmación de correo activada. Comprueba el proveedor Email y configura SMTP para el registro de miembros reales. El servicio de prueba de Supabase solo envía a direcciones pertenecientes al equipo propietario del proyecto; no permite abrir el registro al resto de la comunidad. Introduce la credencial SMTP directamente en Supabase, nunca en el repositorio ni en variables `NEXT_PUBLIC_*`. Desactiva el seguimiento de enlaces del proveedor si modifica los enlaces de confirmación. Consulta [SMTP en Supabase](https://supabase.com/docs/guides/auth/auth-smtp).
 5. En API Keys, copia únicamente la clave **publishable**. No uses `secret`, `service_role` ni la contraseña de la base de datos.
 
 La migración crea `profiles`, `teams`, `memberships`, `trainings`, `attendance`, `routes`, un esquema privado para invitaciones y un bucket GPX **privado** (5 MB). El trigger de `auth.users` crea perfiles; también incorpora usuarios anteriores si los hay. No asigna administradores automáticamente por email ni al primer visitante.
@@ -38,7 +38,7 @@ pnpm dev
 
 ## 3. Primer equipo y validación real
 
-1. Crea tu cuenta en la app y confirma el correo.
+1. Crea tu cuenta en la app y confirma el correo. Comprueba también la recepción en una dirección que no pertenezca al equipo del dashboard de Supabase, para verificar el SMTP real.
 2. Pulsa «Crear mi equipo» con el nombre «Bestias de montaña». Esa transacción te asigna admin **solo del equipo que acabas de crear**.
 3. En Team, genera una invitación. Caduca en 7 días; generar otra revoca la anterior. El código permite unirse como member, nunca como coach/admin.
 4. Registra una segunda cuenta, únete con el código y promuévela a coach desde la cuenta admin.
@@ -46,6 +46,8 @@ pnpm dev
 6. Como miembro, confirma y cancela asistencia; comprueba que el coach ve el listado. La app actualiza datos cada 30 segundos cuando está visible y al recuperar el foco, excepto al editar formularios.
 7. Crea un segundo equipo con otra cuenta y comprueba el aislamiento. Prueba también solicitudes directas fuera de la UI: RLS debe negar lectura/escritura de otros equipos.
 8. Como coach, elimina un entrenamiento de prueba y comprueba que desaparezcan su ruta y confirmaciones.
+9. Cierra sesión, solicita recuperación desde «Olvidé mi contraseña» y abre el enlace recibido. Debe aparecer el formulario de nueva contraseña antes del equipo, incluso al recargar. Guarda una contraseña nueva y comprueba que puedes volver a entrar. Escribe las contraseñas solo en la app.
+10. Comprueba un enlace utilizado o vencido y el reenvío de confirmación. La app debe mostrar un mensaje claro y permitir solicitar otro correo, sin mostrar tokens ni detalles internos del proveedor.
 
 ## Seguridad y límites
 
