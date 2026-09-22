@@ -60,3 +60,15 @@ pnpm dev
 - Storage y PostgreSQL no comparten transacciones. El flujo compensa fallos de subida y borra el archivo antes del entrenamiento. Un fallo parcial, edición simultánea o eliminación directa vía API puede dejar archivos huérfanos; revisa Storage si ocurre. Los archivos de entrenamientos borrados no son legibles por la política.
 - Los datos locales de la v1 no se importan automáticamente. Permanecen en el navegador anterior; publícalos como coach si quieres conservarlos en el equipo.
 - Las pruebas de RLS usan PostgreSQL embebido (PGlite), con esquemas auth/storage mínimos que simulan la plataforma. No sustituyen la validación final contra Auth, Storage y correo del proyecto real.
+
+## Actualización: bajas y readmisiones de miembros
+
+En una instalación que ya tiene la migración inicial, ejecuta únicamente `supabase/migrations/202609220001_member_removal.sql`, antes de desplegar la UI de bajas. En una instalación nueva, ejecuta ambas migraciones en orden. No repitas la migración inicial aplicada.
+
+En **Team**, solo los administradores tienen **Sacar del equipo**. La operación pide confirmación, retira la membresía y sus confirmaciones de asistencia de ese equipo, y conserva la cuenta, el perfil, los otros equipos y los entrenamientos/GPX compartidos. Un administrador no puede expulsarse a sí mismo; siempre se conserva al menos uno.
+
+La baja bloquea el reingreso mediante cualquier código de invitación. El administrador puede usar **Fuera del equipo → Readmitir como miembro**; la persona vuelve con rol `member`, sin recuperar permisos de coach/admin ni confirmaciones anteriores.
+
+RLS y Storage revocan el acceso en las siguientes peticiones, aunque el usuario conserve su sesión. La UI revisa el acceso al recuperar foco, volver a estar visible y cada 30 segundos, incluso si hay un formulario abierto. Al detectar la baja limpia los datos y borradores del equipo. Los archivos que la persona ya descargó no pueden retirarse de su dispositivo.
+
+La lista de bajas solo se consulta mediante una función con comprobación de admin, paginada desde la UI. Las funciones de baja, readmisión, cambio de rol y entrada con invitación serializan por equipo para proteger los permisos frente a cambios simultáneos.
