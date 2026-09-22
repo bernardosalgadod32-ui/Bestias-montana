@@ -1,34 +1,54 @@
 'use client';
-import {useEffect,useMemo,useState} from 'react';
-import {Home,CalendarDays,Map,Users,User,Mountain,MapPin,Clock,Footprints,ChevronRight,Plus,Upload,ArrowLeft,Trash2,Download,Settings,Check,Navigation} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import type { Session } from '@supabase/supabase-js';
+import { initialAuthLink, supabase } from '../lib/supabase';
+import { authErrorMessage, cleanAuthUrl, readRecoveryUser, recoveryUserAfterEvent, writeRecoveryUser } from '../lib/auth-flow';
+import Auth from '../components/auth';
+import Dashboard from '../components/dashboard';
+import PasswordRecovery from '../components/password-recovery';
 
-type Pt={lat:number;lon:number;ele:number};
-type Training={id:string,title:string,date:string,time:string,place:string,km:number,gain:number,duration:number,level:string,description:string,gear:string,gpx?:string,points?:Pt[]};
-const seed:Training[]=[
-{id:'1',title:'Fondo Bestia',date:'2026-09-26',time:'06:30',place:'Bosque · Acceso norte',km:16.2,gain:910,duration:180,level:'Avanzado',description:'Fondo de montaña a ritmo conversacional. Reagrupamos en cruces.',gear:'Agua 1.5 L · geles · rompevientos · celular cargado'},
-{id:'2',title:'Cuestas + técnica',date:'2026-09-29',time:'19:30',place:'Circuito local',km:6.5,gain:330,duration:75,level:'Todos',description:'Bloque de cuestas y técnica de bajada.',gear:'Lámpara frontal · hidratación'}
-];
-const fmt=(d:string)=>new Date(d+'T12:00:00').toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short'});
-function parseGPX(s:string):Pt[]{const x=new DOMParser().parseFromString(s,'application/xml');return [...x.querySelectorAll('trkpt,rtept')].map(n=>({lat:+(n.getAttribute('lat')||0),lon:+(n.getAttribute('lon')||0),ele:+(n.querySelector('ele')?.textContent||0)})).filter(p=>p.lat&&p.lon)}
-function dist(a:Pt,b:Pt){const R=6371,dlat=(b.lat-a.lat)*Math.PI/180,dlon=(b.lon-a.lon)*Math.PI/180,q=Math.sin(dlat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dlon/2)**2;return 2*R*Math.asin(Math.sqrt(q))}
-function stats(p:Pt[]){let km=0,gain=0;for(let i=1;i<p.length;i++){km+=dist(p[i-1],p[i]);gain+=Math.max(0,p[i].ele-p[i-1].ele)}return {km:+km.toFixed(1),gain:Math.round(gain)}}
-function Route({p}:{p:Pt[]}){if(p.length<2)return <div className="mapEmpty"><Map/><b>Sin GPX</b><span>El coach puede cargar la ruta.</span></div>;let minx=Math.min(...p.map(x=>x.lon)),maxx=Math.max(...p.map(x=>x.lon)),miny=Math.min(...p.map(x=>x.lat)),maxy=Math.max(...p.map(x=>x.lat));const pts=p.map(x=>`${10+(x.lon-minx)/(maxx-minx||1)*280},${190-(x.lat-miny)/(maxy-miny||1)*180}`).join(' ');return <div className="route"><svg viewBox="0 0 300 200"><polyline points={pts}/></svg><span>Vista de ruta GPX</span></div>}
-export default function Page(){
- const [tab,setTab]=useState('Inicio'),[list,setList]=useState<Training[]>(seed),[selected,setSelected]=useState<Training|null>(null),[admin,setAdmin]=useState(false),[form,setForm]=useState<Training>({id:'',title:'',date:'',time:'',place:'',km:0,gain:0,duration:90,level:'Intermedio',description:'',gear:''}),[going,setGoing]=useState<string[]>([]);
- useEffect(()=>{try{const a=localStorage.getItem('bestias.trainings'),g=localStorage.getItem('bestias.going');if(a)setList(JSON.parse(a));if(g)setGoing(JSON.parse(g))}catch{}},[]);
- const save=(x:Training[])=>{setList(x);localStorage.setItem('bestias.trainings',JSON.stringify(x))}; const toggle=(id:string)=>{const n=going.includes(id)?going.filter(x=>x!==id):[...going,id];setGoing(n);localStorage.setItem('bestias.going',JSON.stringify(n))};
- const next=useMemo(()=>[...list].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time))[0],[list]);
- const upload=async(e:any)=>{const f=e.target.files?.[0];if(!f)return;const s=await f.text(),points=parseGPX(s),st=stats(points);setForm(v=>({...v,gpx:s,points,km:st.km,gain:st.gain}))};
- const publish=()=>{if(!form.title||!form.date||!form.time)return alert('Falta nombre, fecha u hora');const n={...form,id:form.id||Date.now().toString()};save(form.id?list.map(x=>x.id===form.id?n:x):[...list,n]);setForm({id:'',title:'',date:'',time:'',place:'',km:0,gain:0,duration:90,level:'Intermedio',description:'',gear:''});setAdmin(false);setTab('Agenda')};
- if(selected)return <main><button className="back" onClick={()=>setSelected(null)}><ArrowLeft/>Volver</button><div className="detail"><span className="eyebrow">{fmt(selected.date)} · {selected.time}</span><h1>{selected.title}</h1><p className="location"><MapPin/> {selected.place}</p><Route p={selected.points||[]}/><div className="metrics"><b><Footprints/> {selected.km} km</b><b><Mountain/> +{selected.gain} m</b><b><Clock/> {selected.duration} min</b></div><h3>Entrenamiento</h3><p className="copy">{selected.description}</p><h3>Equipo recomendado</h3><p className="copy">{selected.gear}</p><button className="primary" onClick={()=>toggle(selected.id)}>{going.includes(selected.id)?<><Check/> Confirmado</>:<>Voy 🐾</>}</button>{selected.gpx&&<button className="secondary" onClick={()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([selected.gpx!],{type:'application/gpx+xml'}));a.download=selected.title+'.gpx';a.click()}}><Download/> Descargar GPX</button>}</div></main>;
- if(admin)return <main><button className="back" onClick={()=>setAdmin(false)}><ArrowLeft/>Cancelar</button><h1>Crear entrenamiento</h1><div className="form">{[['Nombre','title'],['Fecha','date'],['Hora','time'],['Punto de reunión','place'],['Duración (min)','duration'],['Dificultad','level'],['Descripción','description'],['Equipo recomendado','gear']].map(([l,k])=><label key={k}>{l}<input type={k==='date'?'date':k==='time'?'time':k==='duration'?'number':'text'} value={(form as any)[k]} onChange={e=>setForm({...form,[k]:k==='duration'?+e.target.value:e.target.value})}/></label>)}<label className="upload"><Upload/> Cargar ruta GPX<input hidden type="file" accept=".gpx,application/gpx+xml" onChange={upload}/></label>{form.points&&<><Route p={form.points}/><p>{form.km} km · +{form.gain} m calculados del GPX</p></>}<button className="primary" onClick={publish}>Publicar entrenamiento</button></div></main>;
- return <main><header><div className="mark"><Mountain/></div><div><small>TRAIL RUNNING TEAM</small><h1>Bestias de montaña</h1><p>#MountainBeastsTeam</p></div><button className="gear" onClick={()=>setAdmin(true)}><Plus/></button></header>
- {tab==='Inicio'&&<>{next&&<section className="hero"><span className="eyebrow">PRÓXIMO ENTRENAMIENTO</span><h2>{next.title}</h2><div className="date">{fmt(next.date)} · {next.time}</div><div className="chips"><span><Footprints/>{next.km} km</span><span><Mountain/>+{next.gain} m</span><span><Clock/>{next.duration} min</span></div><p className="location"><MapPin/> {next.place}</p><button className="primary" onClick={()=>toggle(next.id)}>{going.includes(next.id)?'✓ Confirmado':'Voy 🐾'}</button><button className="secondary" onClick={()=>setSelected(next)}>Ver entrenamiento <ChevronRight/></button></section>}<h3>La semana de las Bestias</h3><Cards list={list} open={setSelected}/></>}
- {tab==='Agenda'&&<><div className="titleRow"><div><h2 className="pageTitle">Agenda</h2><p className="muted">Próximos entrenamientos.</p></div><button className="round" onClick={()=>setAdmin(true)}><Plus/></button></div><Cards list={list} open={setSelected}/></>}
- {tab==='Rutas'&&<><h2 className="pageTitle">Rutas</h2><p className="muted">Biblioteca GPX de la manada.</p><div className="stack">{list.filter(x=>x.points?.length).map(x=><article onClick={()=>setSelected(x)} key={x.id}><Mountain/><div><h4>{x.title}</h4><p>{x.km} km · +{x.gain} m</p></div><ChevronRight/></article>)}{!list.some(x=>x.points?.length)&&<Empty icon={<Map/>} title="Aún no hay rutas" text="Carga un GPX al crear un entrenamiento."/ >}</div></>}
- {tab==='Team'&&<><h2 className="pageTitle">Team</h2><div className="team"><div className="avatar">B</div><div><b>Bestias de montaña</b><p>{going.length} confirmaciones guardadas en este dispositivo</p></div></div><Empty icon={<Users/>} title="La manada" text="La siguiente fase conectará perfiles y asistencia compartida."/ ></>}
- {tab==='Perfil'&&<><h2 className="pageTitle">Perfil</h2><div className="profile"><div className="avatar">🐾</div><h2>Bestia</h2><p>{going.length} entrenamientos confirmados</p></div><button className="secondary" onClick={()=>setAdmin(true)}><Settings/> Modo coach · crear entrenamiento</button></>}
- <Nav tab={tab} setTab={setTab}/></main>}
-function Cards({list,open}:{list:Training[],open:(x:Training)=>void}){return <div className="stack">{list.map(s=><article onClick={()=>open(s)} key={s.id}><b>{fmt(s.date).toUpperCase()}</b><div><h4>{s.title}</h4><p>{s.time} · {s.place}</p><small>{s.km} km · +{s.gain} m · {s.level}</small></div><ChevronRight/></article>)}</div>}
-function Nav({tab,setTab}:{tab:string,setTab:(x:string)=>void}){const a=[['Inicio',Home],['Agenda',CalendarDays],['Rutas',Map],['Team',Users],['Perfil',User]] as const;return <nav>{a.map(([n,I])=><button key={n} onClick={()=>setTab(n)} className={tab===n?'active':''}><I/><span>{n}</span></button>)}</nav>}
-function Empty({icon,title,text}:{icon:React.ReactNode,title:string,text:string}){return <section className="empty">{icon}<h2>{title}</h2><p>{text}</p></section>}
+export default function Page() {
+  const [session, setSession] = useState<Session | null>(null), [ready, setReady] = useState(false);
+  const [recovery, setRecovery] = useState(false), [linkError, setLinkError] = useState(initialAuthLink.error), [notice, setNotice] = useState('');
+  const recoveryUser = useRef<string | null>(null);
+  function rememberRecovery(userId: string | null) {
+    recoveryUser.current = userId; writeRecoveryUser(userId); setRecovery(Boolean(userId));
+  }
+  useEffect(() => {
+    if (!supabase) { setReady(true); return; }
+    const client = supabase;
+    let active = true;
+    recoveryUser.current = readRecoveryUser();
+    const { data } = client.auth.onAuthStateChange((event, value) => {
+      if (!active) return;
+      setSession(value);
+      rememberRecovery(recoveryUserAfterEvent(event, recoveryUser.current, value?.user.id ?? null));
+      if (event === 'SIGNED_OUT') setNotice('');
+    });
+    void (async () => {
+      const initialized = await client.auth.initialize();
+      if (!active) return;
+      if (initialAuthLink.callback) window.history.replaceState(window.history.state, '', cleanAuthUrl(window.location.href));
+      if (initialized.error || initialAuthLink.error) {
+        rememberRecovery(null);
+        setLinkError(initialAuthLink.error || authErrorMessage(initialized.error));
+        setReady(true); return;
+      }
+      const result = await client.auth.getSession();
+      if (!active) return;
+      if (result.error) setLinkError(authErrorMessage(result.error));
+      const current = result.data.session;
+      setSession(current);
+      rememberRecovery(current && (initialAuthLink.recovery || recoveryUser.current === current.user.id || recoveryUser.current === 'pending') ? current.user.id : null);
+      setReady(true);
+    })().catch(error => {
+      if (active) { setLinkError(authErrorMessage(error)); rememberRecovery(null); setReady(true); }
+    });
+    return () => { active = false; data.subscription.unsubscribe(); };
+  }, []);
+  if (!supabase) return <main><h1>Bestias de montaña</h1><p className="copy">Estamos preparando la conexión con el equipo. Vuelve pronto.</p></main>;
+  if (!ready) return <main><p role="status">Cargando tu manada…</p></main>;
+  if (linkError || !session) return <Auth initialMessage={linkError} onAuthenticated={() => setLinkError('')} />;
+  if (recovery) return <PasswordRecovery onComplete={() => { rememberRecovery(null); setNotice('Contraseña actualizada. Ya puedes continuar con tu equipo.'); }} />;
+  return <>{notice && <p role="status" className="notice" style={{ maxWidth: 520, margin: '16px auto' }}>{notice}</p>}<Dashboard key={session.user.id} userId={session.user.id} /></>;
+}

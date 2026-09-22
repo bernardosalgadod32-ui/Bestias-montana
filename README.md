@@ -1,21 +1,24 @@
 # Bestias de montaña
 
-MVP mobile-first para gestionar entrenamientos, rutas GPX y comunidad de un equipo de trail running.
+App móvil de trail running con Next.js 15.5.9 y Supabase (Auth, PostgreSQL y Storage). Mantiene la estética negra/blanca y las pestañas Inicio, Agenda, Rutas, Team y Perfil.
 
-## MVP 0.1
-- Inicio con próximo entrenamiento
-- Confirmación “Voy 🐾” en interfaz
-- Agenda semanal
-- Secciones Rutas, Team y Perfil
-- Navegación móvil
-- Manifest preparado para evolución a PWA
+- Cuentas y perfiles; equipos con invitaciones y roles admin/coach/member.
+- Coaches: crear, editar y eliminar entrenamientos y adjuntar rutas GPX.
+- Miembros: confirmar/cancelar asistencia y consultar asistentes del equipo.
+- Mapa Leaflet/OpenStreetMap, validación GPX, estadísticas y descarga privada.
+- RLS y permisos Storage por equipo; pruebas de seguridad ejecutables.
 
-## Ejecutar
-```bash
-npm install
-npm run dev
+Consulta [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) para activar Supabase/Vercel y validar con cuentas reales.
+
+## Desarrollo
+
+Node 24 y pnpm 11.19.0. Copia `.env.example` a `.env.local` y configura la clave **publishable**.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm test
+pnpm build
+pnpm dev
 ```
-Luego abre http://localhost:3000.
 
-## Siguiente sprint
-Supabase (Auth/Postgres/Storage), CRUD de entrenamientos, carga y parsing de GPX, MapLibre, perfil de elevación y asistencia persistente.
+La migración inicial está en `supabase/migrations/202609210001_multiuser.sql`. No se utilizan contraseñas de base de datos ni claves service-role en la aplicación.
