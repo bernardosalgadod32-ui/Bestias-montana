@@ -9,22 +9,23 @@
     "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.57.4",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.468.0",
     "next": "15.5.9",
     "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "@supabase/supabase-js": "^2.57.4",
-    "leaflet": "^1.9.4"
+    "react-dom": "19.1.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.3.14",
+    "@types/jsdom": "^21.1.7",
+    "@types/leaflet": "^1.9.20",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "typescript": "^5.7.2",
-    "@types/leaflet": "^1.9.20",
-    "@electric-sql/pglite": "^0.3.14",
     "jsdom": "^26.1.0",
-    "tsx": "^4.20.5"
+    "tsx": "^4.20.5",
+    "typescript": "^5.7.2"
   },
   "packageManager": "pnpm@11.19.0"
 }
