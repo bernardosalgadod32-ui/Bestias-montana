@@ -5,6 +5,9 @@ import { Home, CalendarDays, Map, Users, User, Mountain, MapPin, Clock, Footprin
 import { supabase } from '../lib/supabase';
 import { allRows } from '../lib/pagination';
 import { GPX_MIME_TYPE, gpxUploadBody, MAX_GPX_BYTES, parseGPX, routeStats, type Point } from '../lib/gpx';
+import TrainingPhotos from './training-photos';
+import { useWelcomeGuide } from './welcome-guide';
+import { PHOTO_BUCKET, type TrainingPhoto } from '../lib/photos';
 import TeamMembers from './team-members';
 import type { Attendance, Membership, Profile, RemovedMember, Role, Route, Team, Training } from '../lib/types';
 const RouteMap = dynamic(() => import('./route-map'), { ssr: false, loading: () => <p>Cargando mapa…</p> });
@@ -15,6 +18,7 @@ const fmt = (date: string, timezone: string) => new Date(date).toLocaleString('e
 
 export default function Dashboard({ userId }: { userId: string }) {
   const db = supabase!;
+  const openGuide = useWelcomeGuide();
   const [teams, setTeams] = useState<Team[]>([]), [teamId, setTeamId] = useState('');
   const [members, setMembers] = useState<Membership[]>([]), [profiles, setProfiles] = useState<Profile[]>([]);
   const [removedMembers, setRemovedMembers] = useState<RemovedMember[]>([]);
@@ -148,8 +152,17 @@ export default function Dashboard({ userId }: { userId: string }) {
     });
   }
   async function deleteTraining(t: Training) {
-    if (!window.confirm(`¿Eliminar «${t.title}» y sus confirmaciones?`)) return;
+    if (!window.confirm(`¿Eliminar «${t.title}» y sus confirmaciones, fotos y ruta?`)) return;
     await run(async () => {
+      // Remove through Storage API first; a failed cleanup leaves the session retryable.
+      const photos = await allRows<TrainingPhoto>((from, to) => db.from('training_photos').select('*').eq('training_id', t.id).order('id').range(from, to));
+      for (let i = 0; i < photos.length; i += 100) {
+        const batch = photos.slice(i, i + 100);
+        const removed = await db.storage.from(PHOTO_BUCKET).remove(batch.map(photo => photo.path));
+        if (removed.error) throw removed.error;
+        const metadata = await db.from('training_photos').delete().in('id', batch.map(photo => photo.id));
+        if (metadata.error) throw metadata.error;
+      }
       const route = routes.find(r => r.training_id === t.id);
       if (route) {
         const result = await db.storage.from('gpx').remove([route.path]); if (result.error) throw result.error;
@@ -185,7 +198,7 @@ export default function Dashboard({ userId }: { userId: string }) {
   const joinForm = <form className="form panel" onSubmit={join}><label>Código de invitación<input required value={joinCode} onChange={e => setJoinCode(e.target.value)} placeholder="Pídelo al administrador" /></label><button className="secondary" disabled={busy}>Unirme al equipo</button></form>;
   const createForm = <form className="form panel" onSubmit={create}><label>Nombre del equipo<input required maxLength={80} value={teamName} onChange={e => setTeamName(e.target.value)} /></label><button className="primary" disabled={busy}>Crear mi equipo</button></form>;
   if (loading) return <main>{alerts}<p role="status">Cargando equipo…</p></main>;
-  if (!team) return <main><Mountain /><h1>Encuentra tu manada</h1>{alerts}<p className="copy">Usa una invitación para unirte o crea un equipo que administrarás.</p>{joinForm}{createForm}<button className="secondary" onClick={() => run(async () => { const r = await db.auth.signOut(); if(r.error) throw r.error; })}>Cerrar sesión</button></main>;
+  if (!team) return <main><Mountain /><h1>Encuentra tu manada</h1><button className="secondary" onClick={openGuide}>Ver guía de la app</button>{alerts}<p className="copy">Usa una invitación para unirte o crea un equipo que administrarás.</p>{joinForm}{createForm}<button className="secondary" onClick={() => run(async () => { const r = await db.auth.signOut(); if(r.error) throw r.error; })}>Cerrar sesión</button></main>;
 
   if (editing !== null) return <main>{alerts}<button disabled={busy} className="back" onClick={() => setEditing(null)}><ArrowLeft />Cancelar</button><h1>{editing === 'new' ? 'Crear' : 'Editar'} entrenamiento</h1><form className="form" onSubmit={saveTraining}>
     <label>Nombre<input required maxLength={120} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></label>
@@ -198,7 +211,7 @@ export default function Dashboard({ userId }: { userId: string }) {
     {preview.length > 0 && <RouteMap points={preview} />}<button className="primary" disabled={busy || !canCoach}>{busy ? 'Guardando…' : 'Guardar entrenamiento'}</button>
   </form></main>;
 
-  if (selected) return <main>{alerts}<button className="back" disabled={busy} onClick={() => setSelectedId('')}><ArrowLeft />Volver</button><div className="detail"><span className="eyebrow">{fmt(selected.starts_at, timezone)}</span><h1>{selected.title}</h1><p className="location"><MapPin />{selected.place}</p>{routeLoading ? <p>Cargando ruta…</p> : points.length > 0 ? <RouteMap points={points} /> : <div className="mapEmpty"><Map /><b>{routeError || 'Sin ruta GPX'}</b></div>}<Metrics t={selected} /><h3>Entrenamiento</h3><p className="copy">{selected.description || 'Sin descripción.'}</p><h3>Equipo recomendado</h3><p className="copy">{selected.gear || 'Consulta al coach.'}</p><button className="primary" disabled={busy} onClick={() => toggle(selected)}>{going(selected.id) ? '✓ Confirmado · cancelar asistencia' : 'Voy 🐾'}</button>{selectedRoute && <button className="secondary" disabled={busy} onClick={download}><Download />Descargar GPX</button>}<h3>Asistentes · {attendance.filter(a => a.training_id === selected.id).length}</h3><ul className="attendees">{attendance.filter(a => a.training_id === selected.id).map(a => <li key={a.user_id}>{profileName(a.user_id)}{a.user_id === userId ? ' (tú)' : ''}</li>)}</ul>{!attendance.some(a => a.training_id === selected.id) && <p className="muted">Sé la primera Bestia en confirmar.</p>}{canCoach && <><button disabled={busy} className="secondary" onClick={() => startEdit(selected)}>Editar entrenamiento</button><button disabled={busy} className="secondary" onClick={() => deleteTraining(selected)}>Eliminar entrenamiento</button></>}</div></main>;
+  if (selected) return <main>{alerts}<button className="back" disabled={busy} onClick={() => setSelectedId('')}><ArrowLeft />Volver</button><div className="detail"><span className="eyebrow">{fmt(selected.starts_at, timezone)}</span><h1>{selected.title}</h1><p className="location"><MapPin />{selected.place}</p>{routeLoading ? <p>Cargando ruta…</p> : points.length > 0 ? <RouteMap points={points} /> : <div className="mapEmpty"><Map /><b>{routeError || 'Sin ruta GPX'}</b></div>}<Metrics t={selected} /><h3>Entrenamiento</h3><p className="copy">{selected.description || 'Sin descripción.'}</p><h3>Equipo recomendado</h3><p className="copy">{selected.gear || 'Consulta al coach.'}</p><button className="primary" disabled={busy} onClick={() => toggle(selected)}>{going(selected.id) ? '✓ Confirmado · cancelar asistencia' : 'Voy 🐾'}</button>{selectedRoute && <button className="secondary" disabled={busy} onClick={download}><Download />Descargar GPX</button>}<h3>Asistentes · {attendance.filter(a => a.training_id === selected.id).length}</h3><ul className="attendees">{attendance.filter(a => a.training_id === selected.id).map(a => <li key={a.user_id}>{profileName(a.user_id)}{a.user_id === userId ? ' (tú)' : ''}</li>)}</ul>{!attendance.some(a => a.training_id === selected.id) && <p className="muted">Sé la primera Bestia en confirmar.</p>}<TrainingPhotos key={selected.id} trainingId={selected.id} teamId={teamId} userId={userId} canModerate={canCoach} />{canCoach && <><button disabled={busy} className="secondary" onClick={() => startEdit(selected)}>Editar entrenamiento</button><button disabled={busy} className="secondary" onClick={() => deleteTraining(selected)}>Eliminar entrenamiento</button></>}</div></main>;
 
   return <main><header><div className="mark"><Mountain /></div><div><small>TRAIL RUNNING TEAM</small><h1>{team.name}</h1><p>#MountainBeastsTeam</p></div>{canCoach && <button aria-label="Crear entrenamiento" className="gear" onClick={() => startEdit()}><Plus /></button>}</header>{alerts}
     {teams.length > 1 && <label className="team-picker">Equipo<select value={teamId} disabled={busy} onChange={e => { clearTeamData(); setTeamId(e.target.value); setLoading(true); }}>{teams.map(t => <option value={t.id} key={t.id}>{t.name}</option>)}</select></label>}
@@ -211,10 +224,11 @@ export default function Dashboard({ userId }: { userId: string }) {
       <TeamMembers members={members} removed={removedMembers} userId={userId} role={role} busy={busy} nameOf={profileName} onRemove={removeMember} onReadmit={readmitMember} onRoleChange={(memberId: string, newRole: Role) => { void run(async () => { const result = await db.rpc('set_member_role', { t: teamId, member_id: memberId, new_role: newRole }); if (result.error) throw result.error; }); }} />
       {role === 'admin' && <section className="panel"><button className="secondary" disabled={busy} onClick={() => run(async () => { const r = await db.rpc('create_invite', { t: teamId }); if (r.error) throw r.error; setInvite(r.data); })}>Generar invitación</button><p className="muted">Válida durante 7 días. Al generar otra, la anterior deja de funcionar. Quien tenga el código podrá unirse como miembro.</p>{invite && <div className="form"><label>Código para compartir<input readOnly value={invite} onFocus={e => e.target.select()} /></label><button className="secondary" onClick={() => run(async () => { await navigator.clipboard.writeText(invite); setNotice('Código copiado.'); })}>Copiar código</button></div>}</section>}
     </>}
-    {tab === 'Perfil' && <><h2 className="pageTitle">Perfil</h2><form className="form panel" onSubmit={e => { e.preventDefault(); void run(async () => { const r = await db.from('profiles').update({ display_name: displayName.trim() }).eq('id', userId); if (r.error) throw r.error; setNotice('Perfil actualizado.'); }); }}><label>Tu nombre<input required maxLength={80} value={displayName} onChange={e => setDisplayName(e.target.value)} /></label><p className="muted">{attendance.filter(a => a.user_id === userId).length} entrenamientos confirmados</p><button disabled={busy} className="primary">Guardar perfil</button></form>{joinForm}<details><summary>Crear otro equipo</summary>{createForm}</details><button className="secondary" disabled={busy} onClick={() => run(async () => { const r = await db.auth.signOut(); if (r.error) throw r.error; })}>Cerrar sesión</button></>}
+    {tab === 'Perfil' && <><h2 className="pageTitle">Perfil</h2><button className="secondary" onClick={openGuide}>Ver guía de la app</button><form className="form panel" onSubmit={e => { e.preventDefault(); void run(async () => { const r = await db.from('profiles').update({ display_name: displayName.trim() }).eq('id', userId); if (r.error) throw r.error; setNotice('Perfil actualizado.'); }); }}><label>Tu nombre<input required maxLength={80} value={displayName} onChange={e => setDisplayName(e.target.value)} /></label><p className="muted">{attendance.filter(a => a.user_id === userId).length} entrenamientos confirmados</p><button disabled={busy} className="primary">Guardar perfil</button></form>{joinForm}<details><summary>Crear otro equipo</summary>{createForm}</details><button className="secondary" disabled={busy} onClick={() => run(async () => { const r = await db.auth.signOut(); if (r.error) throw r.error; })}>Cerrar sesión</button></>}
     <nav>{([['Inicio',Home],['Agenda',CalendarDays],['Rutas',Map],['Team',Users],['Perfil',User]] as const).map(([name, Icon]) => <button key={name} className={tab === name ? 'active' : ''} onClick={() => setTab(name)}><Icon /><span>{name}</span></button>)}</nav>
   </main>;
 }
 function Metrics({ t }: { t: Training }) { return <div className="metrics"><b><Footprints />{t.km} km</b><b><Mountain />+{t.gain} m</b><b><Clock />{t.duration} min</b></div>; }
 function Cards({ list, open, timezone }: { list: Training[]; open: (id: string) => void; timezone: string }) { return <div className="stack">{list.map(t => <button className="training-card" onClick={() => open(t.id)} key={t.id}><CalendarDays /><div><h4>{t.title}</h4><p>{fmt(t.starts_at, timezone)}</p><small>{t.place} · {t.km} km · {t.level}</small></div><ChevronRight /></button>)}</div>; }
 function Empty({ title, text }: { title: string; text: string }) { return <section className="empty"><Mountain /><h2>{title}</h2><p>{text}</p></section>; }
+
