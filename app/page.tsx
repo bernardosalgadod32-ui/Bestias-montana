@@ -3,11 +3,14 @@ import { useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { initialAuthLink, supabase } from '../lib/supabase';
 import { authErrorMessage, cleanAuthUrl, readRecoveryUser, recoveryUserAfterEvent, writeRecoveryUser } from '../lib/auth-flow';
+import WelcomeGuide from '../components/welcome-guide';
 import Auth from '../components/auth';
 import Dashboard from '../components/dashboard';
 import PasswordRecovery from '../components/password-recovery';
 
-export default function Page() {
+export default function Page() { return <WelcomeGuide autoShow={!initialAuthLink.callback}><PageContent /></WelcomeGuide>; }
+
+function PageContent() {
   const [session, setSession] = useState<Session | null>(null), [ready, setReady] = useState(false);
   const [recovery, setRecovery] = useState(false), [linkError, setLinkError] = useState(initialAuthLink.error), [notice, setNotice] = useState('');
   const recoveryUser = useRef<string | null>(null);
@@ -52,3 +55,4 @@ export default function Page() {
   if (recovery) return <PasswordRecovery onComplete={() => { rememberRecovery(null); setNotice('Contraseña actualizada. Ya puedes continuar con tu equipo.'); }} />;
   return <>{notice && <p role="status" className="notice" style={{ maxWidth: 520, margin: '16px auto' }}>{notice}</p>}<Dashboard key={session.user.id} userId={session.user.id} /></>;
 }
+
