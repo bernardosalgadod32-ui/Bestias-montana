@@ -1,6 +1,5 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-// @ts-expect-error jsdom is used only to supply the browser DOMParser in tests.
 import { JSDOM } from 'jsdom';
 import { parseGPX, routeStats, MAX_GPX_BYTES } from '../lib/gpx';
 globalThis.DOMParser = new JSDOM('').window.DOMParser;
