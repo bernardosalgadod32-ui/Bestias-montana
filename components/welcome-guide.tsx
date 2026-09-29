@@ -1,6 +1,6 @@
 'use client';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { Mountain, CalendarDays, Map, Camera, Users } from 'lucide-react';
+import { Mountain, CalendarDays, Map, Camera, Users, Trophy } from 'lucide-react';
 
 const KEY = 'bestias:welcome:v1';
 const GuideContext = createContext<() => void>(() => {});
@@ -10,6 +10,7 @@ const steps = [
  { Icon: CalendarDays, title: 'Encuentra tu próximo entreno', text: 'En Inicio encontrarás la próxima salida. En Agenda puedes consultar todos los entrenamientos, incluidos los anteriores.', tip: 'Abre un entrenamiento para revisar horario, dificultad, distancia, desnivel, punto de reunión y equipo recomendado. Pulsa «Voy» para confirmar tu asistencia; puedes cancelarla desde el mismo botón.' },
  { Icon: Map, title: 'Conoce la ruta', text: 'Rutas reúne los entrenamientos con un archivo GPX. En el detalle podrás ver el trazado sobre el mapa.', tip: 'Pulsa «Descargar GPX» para llevar el archivo a tu aplicación de navegación favorita. Necesitas conexión para consultar los datos de esta app.' },
  { Icon: Camera, title: 'Comparte los recuerdos', text: 'Cada entrenamiento tiene su propio álbum. Abre «Fotos del entreno» para subir fotos desde tu teléfono o computadora.', tip: 'Todo el equipo puede descargar las fotos. «Compartir» abre las opciones disponibles en tu dispositivo; si no es compatible, descarga la foto y publícala desde tu red social.' },
+ { Icon: Trophy, title: 'Conquista el reto del mes', text: 'En Retos puedes unirte a metas de kilómetros, minutos, desnivel, salidas o hábitos. Registra tu actividad y adjunta una evidencia si quieres.', tip: 'El coach puede pedir validación. Solo lo aceptado suma en la clasificación y en tu perfil, donde encontrarás tu historial y medallas. Confirma asistencia con «Voy», pero registra aparte el esfuerzo realizado.' },
  { Icon: Users, title: 'Tu equipo, siempre a mano', text: 'En Team encontrarás a la manada. En Perfil puedes cambiar tu nombre y volver a abrir esta guía cuando quieras.', tip: 'Los coaches crean entrenamientos y rutas. Los administradores también gestionan invitaciones y miembros. Para tener la app a mano, busca «Instalar app» o «Agregar a pantalla de inicio» en el menú de tu navegador, si está disponible.' },
 ];
 export default function WelcomeGuide({ children, autoShow = true }: { children: React.ReactNode; autoShow?: boolean }) {
