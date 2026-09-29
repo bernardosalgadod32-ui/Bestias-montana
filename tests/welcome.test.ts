@@ -16,7 +16,7 @@ test('welcome appears once, navigates all steps, can be reopened and does not ob
  const click = async(text:string) => { const button=Array.from(document.querySelectorAll('button')).find(b=>b.textContent===text); assert.ok(button); await act(async()=>button.click()); };
  try {
   await act(async()=>root.render(mount())); assert.ok(document.querySelector('dialog[open]'));
-  for(let i=0;i<4;i++) await click('Siguiente');
+  for(let i=0;i<5;i++) await click('Siguiente');
   assert.match(document.querySelector('h2')!.textContent!,/Tu equipo/);
   await click('¡Vamos, Bestia!'); assert.equal(document.querySelector('dialog[open]'),null);
   await act(async()=>root.unmount()); root=createRoot(container);
